@@ -1,0 +1,164 @@
+
+(1) request payment information, required for auction creation.  for zero
+    creation fees, price is 0, and "txout" is not required.
+
+{
+	id: 1,
+	method: "auction.prepare",
+	params: [
+		{
+		// auction creator's address/identity
+		userid: "mkzfa27nZdHvwTZ6CitKmxroHrPbuvQQ4y",
+
+		// type of auction you wish to create
+		type: "first-price-sealed-bid",
+		}
+	]
+}
+{
+	jsonrpc: "2.0",
+	id: 1,
+	result: {
+		price: 50000,		// auction creation price (in satoshis)
+		server_txout: "1234ABCD...", // auction creation payment (hex)
+		nonce: 11223344,	// auction creation nonce value
+		n_confirm: 1,		// required number of confirmations
+					// for creation payment
+	}
+}
+
+
+(2) send auction creation payment, wait for n_confirm confirmations
+
+(3) create auction
+
+{
+	id: 2,
+	method: "auction.create",
+	params: [
+		{
+		nonce: 11223344, // nonce value from auction.prepare
+
+		// each bid MUST specify the same tx input
+		// which the auction owner MUST be able to spend
+		bid.input.hash: "1234ABCD...",
+		bid.input.n: 0,
+
+		// each bid MUST spend the value to this txout (hex encoded)
+		bid.txout: "4567FEDC...",
+
+		// auction end time (unix timestamp)
+		// for the hyper-precise, the auction expires
+		// at time X.0 (X plus zero nanoseconds).
+		expires: 1379034854,
+
+		// require all bids to set nlocktime==auction expire?
+		// true: auction cannot be ended early (more fair?)
+		// false: auction may be ended early
+		expires.lock: true,
+		}
+	]
+}
+{
+	jsonrpc: "2.0",
+	id: 2,
+	result: {
+		// unique auction id
+		id: "64025af8a05de3ff0f7a0a829c81f2293cf93cee570109f93e37...",
+	}
+}
+
+(4) bidder obtains information required to bid on auction
+
+{
+	id: 3
+	method: "auction.bid.info",
+	params: [
+		{
+		// unique auction id
+		id: "64025af8a05de3ff0f7a0a829c81f2293cf93cee570109f93e37...",
+		}
+	]
+}
+{
+	jsonrpc: "2.0",
+	id: 3,
+	result: {
+		// each bid MUST specify the same tx input
+		// which the auction owner MUST be able to spend
+		bid.input.hash: "1234ABCD...",
+		bid.input.n: 0,
+
+		// each bid MUST spend the value to this txout (hex encoded)
+		bid.txout: "4567FEDC...",
+
+		// nlocktime MUST be set to this value (might be zero)
+		bid.nlocktime: 1379034854,
+	}
+}
+
+(5) zero or more bids are submitted
+
+{
+	id: 4
+	method: "auction.bid",
+	params: [
+		{
+		// unique auction id
+		id: "64025af8a05de3ff0f7a0a829c81f2293cf93cee570109f93e37...",
+
+		// bidder's address/identity, for signing messages
+		bidder: "moRmfigG2pZeKh63ubgP444bPpXCxwVYDx",
+
+		// transaction containing bid (hex encoded)
+		tx: "d174888827bd855fe215...",
+		}
+	]
+}
+{
+	jsonrpc: "2.0",
+	id: 4,
+	result: true,
+}
+
+(6) watch auction
+
+{
+	id: 5
+	method: "auction.info",
+	params: [
+		{
+		// unique auction id
+		id: "64025af8a05de3ff0f7a0a829c81f2293cf93cee570109f93e37...",
+		}
+	]
+
+}
+{
+	jsonrpc: "2.0",
+	id: 5,
+	result: {
+		// is the auction active, or ended?
+		active: true,
+
+		// auction end time (unix timestamp)
+		// for the hyper-precise, the auction expires
+		// at time X.0 (X plus zero nanoseconds).
+		expires: 1379034854,
+
+		// number of bids
+		// in a sealed bid auction, this is the number
+		// of sealed bids submitted to server
+		bid.count: 1000,
+
+		// only present if active==false
+		winner: "moRmfigG2pZeKh63ubgP444bPpXCxwVYDx",
+
+		// _fully signed_ winning transaction (hex encoded)
+		// only present if active==false
+		// OPTIONAL, depending on server capabilities
+		// (some auction servers may not be able to sign TX's)
+		winner.tx: "1234ABCD..."
+	}
+}
+
