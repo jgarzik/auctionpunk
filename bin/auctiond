@@ -35,6 +35,12 @@ if (cfg.log)
 var db_fn = cfg.db || 'auctiond.db';
 var sslkey_fn = cfg.ssl_key || 'server.key';
 var sslcert_fn = cfg.ssl_cert || 'server.cert';
+var feeInfo = {
+	account: cfg.fee_account || 'auctionfees',
+	price_FPSB: cfg.fee_FPSB || 50000,
+	expiration: cfg.fee_expiration || 2000,
+	n_confirm: cfg.fee_confirms || 1,
+};
 var httpsrv = undefined;
 var admsrv = undefined;
 var db = undefined;
@@ -71,11 +77,11 @@ function cmdAuctionPrep(req)
 	var nonceObj = {
 		userid: params.userid,
 		type: params.type,
-		expires: timeUtil.curtime() + (1 * 60 * 60),
-		price: 50000,
+		expires: timeUtil.curtime() + feeInfo.expiration,
+		price: feeInfo.price_FPSB,
 		txout: '...',	// FIXME
 		nonce: nonce,
-		n_confirm: 0,
+		n_confirm: feeInfo.n_confirm,
 	};
 
 	// save in db
