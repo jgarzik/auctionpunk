@@ -36,6 +36,13 @@ function stop_all()
 		admsrv.close();
 }
 
+function dbWriteSync()
+{
+	var tmpFn = db_fn + ".tmp";
+	EncFile.writeJFileSync(ENC_METHOD, process.env.AUCTIOND, tmpFn, db);
+	fs.renameSync(tmpFn, db_fn);
+}
+
 function cmdAuctionPrep(req)
 {
 	var params = req.params[0];
@@ -62,6 +69,9 @@ function cmdAuctionPrep(req)
 
 	// save in db
 	db.pending_nonce[nonce] = nonceObj;
+
+	// write entire db to disk
+	dbWriteSync();
 
 	var rpcResult = {
 		price: nonceObj.price,
@@ -128,6 +138,9 @@ function cmdAuctionCreate(req)
 	};
 
 	db.auctions[hashStr] = auctionObj;
+
+	// write entire db to disk
+	dbWriteSync();
 
 	var rpcResult = {
 		id: hashStr,
@@ -237,6 +250,9 @@ function cmdAuctionBid(req)
 
 	auctionObj.bids[params.bidder] = bidObj;
 
+	// write entire db to disk
+	dbWriteSync();
+
 	return jrpcServer.ok(req, true);
 }
 
@@ -340,8 +356,8 @@ function read_db()
 
 			auctions: {},
 		};
-		EncFile.writeJFileSync(ENC_METHOD, process.env.AUCTIOND,
-				       db_fn, db);
+
+		dbWriteSync();
 	} else
 		db = EncFile.readJFileSync(ENC_METHOD, process.env.AUCTIOND, db_fn);
 }
