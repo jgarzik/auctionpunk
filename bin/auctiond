@@ -8,6 +8,7 @@ var coinUtil = require('libcoin/util/util');
 var Transaction = require('libcoin/Transaction').class();
 var Parser = require('libcoin/util/BinaryParser').class();
 var jrpcServer = require('../jrpcServer');
+var winston = require('winston');
 
 var VERSION = '0.0.1';
 var ENC_METHOD = 'aes-256-cbc';
@@ -21,6 +22,11 @@ program
 	.option('--port <n>', 'TCP listen port', parseInt)
 	.parse(process.argv);
 
+var logger = new (winston.Logger)({
+	transports: [
+		new (winston.transports.Console)({ timestamp: true }),
+	],
+});
 var db_fn = program.db || 'auctiond.db';
 var sslkey_fn = program.sslkey || 'server.key';
 var sslcert_fn = program.sslcert || 'server.cert';
@@ -331,14 +337,14 @@ function start_http()
 		cert: fs.readFileSync(sslcert_fn),
 		port: program.port || 12882,
 	};
-	httpsrv = jrpcServer.create(opts, handle_jsonrpc);
+	httpsrv = jrpcServer.create(opts, handle_jsonrpc, logger, "http");
 
 	opts = {
 		key: fs.readFileSync(sslkey_fn),
 		cert: fs.readFileSync(sslcert_fn),
 		port: program.port || 12883,
 	};
-	admsrv = jrpcServer.create(opts, handle_jsonrpc_admin);
+	admsrv = jrpcServer.create(opts, handle_jsonrpc_admin, logger, "admin");
 }
 
 function read_db()

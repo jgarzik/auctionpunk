@@ -67,9 +67,17 @@ function handle_post(req, resp, body, jrpc_callback)
 	resp.end();
 }
 
-function http_request(req, resp, jrpc_callback)
+function http_request(req, resp, jrpc_callback, logger, logname)
 {
 	var url = require('url').parse(req.url);
+
+	logger.info(logname + ' request', {
+		method: req.method,
+		pathname: url.pathname,
+		headers: req.headers,
+		remote: req.socket.remoteAddress,
+	});
+
 	if (url.pathname != '/v1/' || req.method != 'POST') {
 		http_resp_plain(resp, 404, 'not found');
 		return;
@@ -86,10 +94,10 @@ function http_request(req, resp, jrpc_callback)
 	});
 }
 
-exports.create = function create(httpsOpts, jrpc_callback)
+exports.create = function create(httpsOpts, jrpc_callback, logger, logname)
 {
 	var httpsrv = https.createServer(httpsOpts, function (req, resp) {
-		http_request(req, resp, jrpc_callback);
+		http_request(req, resp, jrpc_callback, logger, logname);
 	});
 
 	var port = httpsOpts.port || 12882;
