@@ -10,6 +10,9 @@ var Parser = require('libcoin/util/BinaryParser').class();
 var jrpcServer = require('../jrpcServer');
 var kvfile = require('../kvfile');
 var winston = require('winston');
+var RpcClient = require('libcoin/Rpcclient').class();
+var Script = require('libcoin/Script').class();
+var Address = require('libcoin/Address').class();
 
 var VERSION = '0.0.1';
 var ENC_METHOD = 'aes-256-cbc';
@@ -44,6 +47,7 @@ var feeInfo = {
 var httpsrv = undefined;
 var admsrv = undefined;
 var db = undefined;
+var rpc = undefined;
 
 function stop_all()
 {
@@ -60,6 +64,16 @@ function dbWriteSync()
 	fs.renameSync(tmpFn, db_fn);
 }
 
+function getTxOut()
+{
+	var addrStr = rpc.getAccountAddress(feeInfo.account);
+	var addr = new Address(addrStr);
+	var pubkeyhash = addr.payload();
+	var script = Script.createPubKeyHashOut(pubkeyhash);
+	script.updateBuffer();
+	return script.getBuffer();
+}
+
 function cmdAuctionPrep(req)
 {
 	var params = req.params[0];
@@ -73,13 +87,15 @@ function cmdAuctionPrep(req)
 	var nonce = db.next_nonce;
 	db.next_nonce += 1;
 
+	var txout = getTxOut();
+
 	// create database nonce object
 	var nonceObj = {
 		userid: params.userid,
 		type: params.type,
 		expires: timeUtil.curtime() + feeInfo.expiration,
 		price: feeInfo.price_FPSB,
-		txout: '...',	// FIXME
+		txout: txout.toString('hex'),
 		nonce: nonce,
 		n_confirm: feeInfo.n_confirm,
 	};
@@ -356,6 +372,14 @@ function start_http()
 		port: cfg.admin_port || 12883,
 	};
 	admsrv = jrpcServer.create(opts, handle_jsonrpc_admin, logger, "admin");
+
+	rpc = new RpcClient({
+		host: cfg.bitcoind_host || '127.0.0.1',
+		port: cfg.bitcoind_port || 18332,
+		user: cfg.bitcoind_user || 'user',
+		pass: cfg.bitcoind_pass || 'pass',
+		protocol: cfg.bitcoind_protocol || 'http',
+	});
 }
 
 function read_db()
