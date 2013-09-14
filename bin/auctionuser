@@ -1,0 +1,66 @@
+#!/usr/bin/env node
+
+var program = require('commander');
+var rpc = require('../jrpcClient');
+
+var VERSION = '0.0.1';
+
+program
+	.version(VERSION)
+	.option('--host <hostname>', 'Remote hostname of auction to contact')
+	.option('--port <n>', 'Remote port of auction to contact')
+	.parse(process.argv);
+
+var rpc_opts = {
+	hostname: program.host || 'localhost',
+	port: program.port || 12882,
+};
+
+function list_commands()
+{
+	var s = "auctionuser command summary:\n";
+	s += "help\t\tList this command summary\n";
+	console.log(s);
+}
+
+function cmd_info(id)
+{
+	rpc.call('auction.info', [{ id: id }], rpc_opts, function(err, result) {
+		if (err)
+			console.log("Auction info failed: " + err.message);
+		else
+			console.dir(result);
+	});
+}
+
+function main()
+{
+	if (program.args.length == 0) {
+		console.error("No command specified.");
+		list_commands();
+		return;
+	}
+
+	var cmd = program.args[0];
+	
+	switch (cmd) {
+
+	default:
+		console.error("Unknown command", cmd);
+		// fall through
+
+	case "help":
+		list_commands();
+		return;
+	
+	case "info":
+		if (program.args.length < 2)
+			throw new Error("info: Missing required auction id");
+		cmd_info(program.args[1]);
+		break;
+	}
+}
+
+main();
+
+
