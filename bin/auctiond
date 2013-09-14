@@ -8,6 +8,7 @@ var coinUtil = require('libcoin/util/util');
 var Transaction = require('libcoin/Transaction').class();
 var Parser = require('libcoin/util/BinaryParser').class();
 var jrpcServer = require('../jrpcServer');
+var kvfile = require('../kvfile');
 var winston = require('winston');
 
 var VERSION = '0.0.1';
@@ -16,10 +17,7 @@ var ENC_METHOD = 'aes-256-cbc';
 program
 	.version(VERSION)
 	.option('--init', 'Initialize database')
-	.option('--sslkey <file>', 'SSL key file (pem format)')
-	.option('--sslcert <file>', 'SSL certificate file (pem format)')
-	.option('--db <file>', 'Encrypted database file')
-	.option('--port <n>', 'TCP listen port', parseInt)
+	.option('-c, --config <file>', 'key=value configuration file')
 	.parse(process.argv);
 
 var logger = new (winston.Logger)({
@@ -27,9 +25,16 @@ var logger = new (winston.Logger)({
 		new (winston.transports.Console)({ timestamp: true }),
 	],
 });
-var db_fn = program.db || 'auctiond.db';
-var sslkey_fn = program.sslkey || 'server.key';
-var sslcert_fn = program.sslcert || 'server.cert';
+var cfg_fn = program.config || 'auctiond.cfg';
+var cfg = kvfile.readSync(cfg_fn);
+if (cfg.log)
+	logger.add(winston.transports.File, { 
+		filename: cfg.log,
+		timestamps: true,
+	});
+var db_fn = cfg.db || 'auctiond.db';
+var sslkey_fn = cfg.ssl_key || 'server.key';
+var sslcert_fn = cfg.ssl_cert || 'server.cert';
 var httpsrv = undefined;
 var admsrv = undefined;
 var db = undefined;
@@ -335,14 +340,14 @@ function start_http()
 	var opts = {
 		key: fs.readFileSync(sslkey_fn),
 		cert: fs.readFileSync(sslcert_fn),
-		port: program.port || 12882,
+		port: cfg.port || 12882,
 	};
 	httpsrv = jrpcServer.create(opts, handle_jsonrpc, logger, "http");
 
 	opts = {
 		key: fs.readFileSync(sslkey_fn),
 		cert: fs.readFileSync(sslcert_fn),
-		port: program.port || 12883,
+		port: cfg.admin_port || 12883,
 	};
 	admsrv = jrpcServer.create(opts, handle_jsonrpc_admin, logger, "admin");
 }

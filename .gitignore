@@ -1,5 +1,7 @@
 
 auctiond.db
+auctiond.cfg
+auctiond.log
 
 server.cert
 server.key
