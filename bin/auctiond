@@ -10,7 +10,7 @@ var Parser = require('libcoin/util/BinaryParser').class();
 var jrpcServer = require('../jrpcServer');
 var kvfile = require('../kvfile');
 var winston = require('winston');
-var RpcClient = require('libcoin/Rpcclient').class();
+var RpcClient = require('libcoin/RpcClient').class();
 var Script = require('libcoin/Script').class();
 var Address = require('libcoin/Address').class();
 
