@@ -8,7 +8,7 @@ var VERSION = '0.0.1';
 program
 	.version(VERSION)
 	.option('--host <hostname>', 'Remote hostname of auction to control')
-	.option('--port <n>', 'Remove port of auction to control')
+	.option('--port <n>', 'Remote port of auction to control')
 	.parse(process.argv);
 
 var rpc_opts = {
