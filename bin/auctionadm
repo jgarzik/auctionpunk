@@ -1,0 +1,95 @@
+#!/usr/bin/env node
+
+var program = require('commander');
+var rpc = require('../jrpcClient');
+
+var VERSION = '0.0.1';
+
+program
+	.version(VERSION)
+	.option('--host <hostname>', 'Remote hostname of auction to control')
+	.option('--port <n>', 'Remove port of auction to control')
+	.parse(process.argv);
+
+var rpc_opts = {
+	hostname: program.host || 'localhost',
+	port: program.port || 12883,
+};
+
+function list_commands()
+{
+	var s = "auctionadm command summary:\n";
+	s += "dump\t\tDump auctiond database\n";
+	s += "help\t\tList this command summary\n";
+	s += "stop\t\tStop auctiond\n";
+	console.log(s);
+}
+
+function cmd_stop()
+{
+	rpc.call('stop', [], rpc_opts, function(err, result) {
+		if (err)
+			console.log("Server stop failed: " + err.message);
+		else
+			console.log("Server stopping");
+	});
+}
+
+function cmd_inval()
+{
+	// command 'inval' does not exist; exercises error handling
+	rpc.call('inval', [], rpc_opts, function(err, result) {
+		if (err)
+			console.log("Server inval failed: " + err.message);
+		else
+			console.log("Server invaling");
+	});
+}
+
+function cmd_dump()
+{
+	rpc.call('dump', [], rpc_opts, function(err, result) {
+		if (err)
+			console.log("Server dump failed: " + err.message);
+		else
+			console.dir(result);
+	});
+}
+
+function main()
+{
+	if (program.args.length == 0) {
+		console.error("No command specified.");
+		list_commands();
+		return;
+	}
+
+	var cmd = program.args[0];
+	
+	switch (cmd) {
+
+	default:
+		console.error("Unknown command", cmd);
+		// fall through
+
+	case "dump":
+		cmd_dump();
+		break;
+
+	case "help":
+		list_commands();
+		return;
+	
+	case "inval":
+		cmd_inval();
+		break;
+	
+	case "stop":
+		cmd_stop();
+		break;
+	}
+}
+
+main();
+
+

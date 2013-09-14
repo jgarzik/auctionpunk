@@ -22,10 +22,19 @@ program
 	.parse(process.argv);
 
 var db_fn = program.db || 'auctiond.db';
-var sslkey_fn = program.sslkey || 'auctiond.key';
-var sslcert_fn = program.sslcert || 'auctiond.cert';
+var sslkey_fn = program.sslkey || 'server.key';
+var sslcert_fn = program.sslcert || 'server.cert';
 var httpsrv = undefined;
+var admsrv = undefined;
 var db = undefined;
+
+function stop_all()
+{
+	if (httpsrv)
+		httpsrv.close();
+	if (admsrv)
+		admsrv.close();
+}
 
 function cmdAuctionPrep(req)
 {
@@ -167,7 +176,7 @@ function checkBidTx(auctionObj, txHex)
 
 	var inIdx = -1;
 	for (var i = 0; i < tx.ins.length; i++) {
-		if tx.ins[i].o.toString('binary') == outptStr) {
+		if (tx.ins[i].o.toString('binary') == outptStr) {
 			inIdx = i;
 			break;
 		}
@@ -193,7 +202,7 @@ function checkBidTx(auctionObj, txHex)
 
 	match = false;
 	for (var i = 0; i < tx.outs.length; i++) {
-		if tx.outs[i].s.toString('binary') == txoutStr) {
+		if (tx.outs[i].s.toString('binary') == txoutStr) {
 			match = true;
 			break;
 		}
@@ -284,6 +293,21 @@ function handle_jsonrpc(req)
 	}
 }
 
+function handle_jsonrpc_admin(req)
+{
+	switch (req.method) {
+	case "dump":
+		return jrpcServer.ok(req, db);
+
+	case "stop":
+		stop_all();
+		return jrpcServer.ok(req, true);
+	
+	default:
+		return jrpcServer.err(req, -1, 'method not found');
+	}
+}
+
 function start_http()
 {
 	var opts = {
@@ -292,6 +316,13 @@ function start_http()
 		port: program.port || 12882,
 	};
 	httpsrv = jrpcServer.create(opts, handle_jsonrpc);
+
+	opts = {
+		key: fs.readFileSync(sslkey_fn),
+		cert: fs.readFileSync(sslcert_fn),
+		port: program.port || 12883,
+	};
+	admsrv = jrpcServer.create(opts, handle_jsonrpc_admin);
 }
 
 function read_db()
