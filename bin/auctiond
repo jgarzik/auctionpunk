@@ -39,9 +39,10 @@ var db_fn = cfg.db || 'auctiond.db';
 var sslkey_fn = cfg.ssl_key || 'server.key';
 var sslcert_fn = cfg.ssl_cert || 'server.cert';
 var feeInfo = {
-	account: cfg.fee_account || 'auctionfees',
+	sweep_account: cfg.fee_account || 'auctionfees',
+	account_prefix: cfg.nonce_prefix || 'nonce-',
 	price_FPSB: cfg.fee_FPSB || 50000,
-	expiration: cfg.fee_expiration || 2000,
+	expiration: cfg.nonce_expiration || 2000,
 	n_confirm: cfg.fee_confirms || 1,
 };
 var httpsrv = undefined;
@@ -64,9 +65,10 @@ function dbWriteSync()
 	fs.renameSync(tmpFn, db_fn);
 }
 
-function getTxOut()
+function getTxOut(nonce)
 {
-	var addrStr = rpc.getAccountAddress(feeInfo.account);
+	var account = feeInfo.account_prefix + nonce;
+	var addrStr = rpc.getAccountAddress(account);
 	var addr = new Address(addrStr);
 	var pubkeyhash = addr.payload();
 	var script = Script.createPubKeyHashOut(pubkeyhash);
@@ -87,7 +89,7 @@ function cmdAuctionPrep(req)
 	var nonce = db.next_nonce;
 	db.next_nonce += 1;
 
-	var txout = getTxOut();
+	var txout = getTxOut(nonce);
 
 	// create database nonce object
 	var nonceObj = {
@@ -105,6 +107,14 @@ function cmdAuctionPrep(req)
 
 	// write entire db to disk
 	dbWriteSync();
+
+	// remove from db after expiration
+	// WARNING: payment after expiration must be handled manually
+	// db update is lazy, postponed until next unrelated event
+	// triggers db update
+	setTimeout(function() {
+		delete db.pending_nonce[nonce];
+	}, feeInfo.expiration * 1000);
 
 	var rpcResult = {
 		price: nonceObj.price,
