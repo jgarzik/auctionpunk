@@ -76,6 +76,17 @@ function getTxOut(nonce)
 	return script.getBuffer();
 }
 
+function checkFeePaid(nonceObj)
+{
+	if (feeInfo.price_FPSB == 0)
+		return true;
+
+	var account = feeInfo.account_prefix + nonceObj.nonce;
+	var balanceDec = rpc.getBalance(account, feeInfo.n_confirm);
+	var balance = coinUtil.parseValue(balanceDec);
+	return balance.ge(feeInfo.price_FPSB);		// balance >= price ?
+}
+
 function cmdAuctionPrep(req)
 {
 	var params = req.params[0];
@@ -89,18 +100,17 @@ function cmdAuctionPrep(req)
 	var nonce = db.next_nonce;
 	db.next_nonce += 1;
 
-	var txout = getTxOut(nonce);
-
 	// create database nonce object
 	var nonceObj = {
 		userid: params.userid,
 		type: params.type,
 		expires: timeUtil.curtime() + feeInfo.expiration,
 		price: feeInfo.price_FPSB,
-		txout: txout.toString('hex'),
 		nonce: nonce,
 		n_confirm: feeInfo.n_confirm,
 	};
+	if (feeInfo.price_FPSB > 0)
+		nonceObj.txout = getTxOut(nonce).toString('hex');
 
 	// save in db
 	db.pending_nonce[nonce] = nonceObj;
@@ -119,10 +129,11 @@ function cmdAuctionPrep(req)
 	var rpcResult = {
 		price: nonceObj.price,
 		"price.expires": nonceObj.expires,
-		"server.txout": nonceObj.txout,
 		nonce: nonce,
 		n_confirm: nonceObj.n_confirm,
 	};
+	if ('txout' in nonceObj)
+		rpcResult["server.txout"] = nonceObj.txout;
 
 	return jrpcServer.ok(req, rpcResult);
 }
@@ -162,6 +173,9 @@ function cmdAuctionCreate(req)
 	if (!nonceObj)
 		return jrpcServer.err(req, -22, 'unknown/expired nonce');
 
+	if (!checkFeePaid(nonceObj))
+		return jrpcServer.err(req, -24, 'auction payment not yet received and confirmed');
+
 	var outpt = outptSerialize(params["bid.input.hash"],
 				   params["bid.input.n"]);
 
@@ -171,6 +185,9 @@ function cmdAuctionCreate(req)
 		return jrpcServer.err(req, -23, 'outpoint matches existing auction');
 
 	var auctionObj = {
+		active: true,
+		creator: nonceObj.userid,
+		type: nonceObj.type,
 		created: timeUtil.curtime(),
 		outptHash: params["bid.input.hash"],
 		outptN: params["bid.input.n"],
@@ -184,6 +201,10 @@ function cmdAuctionCreate(req)
 
 	// write entire db to disk
 	dbWriteSync();
+
+	setTimeout(function() {
+		auctionObj.active = false;
+	}, (auctionObj.expires - timeUtil.curtime()));
 
 	var rpcResult = {
 		id: hashStr,
@@ -201,6 +222,8 @@ function cmdAuctionBidInfo(req)
 	var auctionObj = db.auctions[params.id];
 	if (!auctionObj)
 		return jrpcServer.err(req, -31, 'unknown auction');
+	if (!auctionObj.active)
+		return jrpcServer.err(req, -32, 'closed auction');
 
 	var nlocktime = auctionObj.expiresLock ? auctionObj.expires : 0;
 	var rpcResult = {
@@ -282,6 +305,9 @@ function cmdAuctionBid(req)
 	var auctionObj = db.auctions[params.id];
 	if (!auctionObj)
 		return jrpcServer.err(req, -42, 'unknown auction');
+	if ((!auctionObj.active) ||
+	    (timeUtil.curtime() >= auctionObj.expires))
+		return jrpcServer.err(req, -44, 'closed auction');
 
 	if (!checkBidTx(auctionObj, params.tx))
 		return jrpcServer.err(req, -43, 'invalid bid tx');
@@ -310,12 +336,11 @@ function cmdAuctionInfo(req)
 		return jrpcServer.err(req, -31, 'unknown auction');
 
 	var rpcResult = {
-		active: true,
+		active: auctionObj.active,
 		expires: auctionObj.expires,
 		"bid.count": Object.keys(auctionObj.bids).length,
 	};
 	if ('winner' in auctionObj) {
-		rpcResult.active = false;
 		rpcResult.winner = auctionObj.winner;
 		if ('winnerTx' in auctionObj)
 			rpcResult["winner.tx"] = auctionObj.winnerTx;
