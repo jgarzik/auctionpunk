@@ -236,6 +236,15 @@ function cmdAuctionBidInfo(req)
 	return jrpcServer.ok(req, rpcResult);
 }
 
+function haveUnspent(outptHash, outptN)
+{
+	var txout = rpc.getTxOut(formatHashFull(outptHash), outptN);
+	if (!txout)
+		return false;
+	
+	return (txout.confirmations > 0) ? true : false;
+}
+
 function checkBidTx(auctionObj, txHex)
 {
 	var txRaw = new Buffer(txHex, 'hex');
@@ -255,16 +264,17 @@ function checkBidTx(auctionObj, txHex)
 
 	var inIdx = -1;
 	for (var i = 0; i < tx.ins.length; i++) {
-		if (tx.ins[i].o.toString('binary') == outptStr) {
+		if (tx.ins[i].o.toString('binary') == outptStr)
 			inIdx = i;
-			break;
-		}
+
+		if (!haveUnspent(tx.ins[i].getOutpointHash(),
+			         tx.ins[i].getOutpointIndex()))
+			return false;
 	}
 	if (inIdx < 0)
 		return false;
 
 	// FIXME: validate signatures of other inputs
-	// FIXME: verify all inputs unspent
 
 	// validate nlocktime
 	var match = false;
