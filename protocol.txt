@@ -1,4 +1,7 @@
 
+See https://gist.github.com/jgarzik/6546194 for an up-to-date version 
+of this specification.
+
 (1) request payment information, required for auction creation.  for zero
     creation fees, price is 0, and "txout" is not required.
 
