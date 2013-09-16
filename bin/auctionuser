@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 
+var fs = require('fs');
 var program = require('commander');
 var rpc = require('../jrpcClient');
+var Address = require('libcoin/Address').class();
 
 var VERSION = '0.0.1';
 
@@ -19,8 +21,45 @@ var rpc_opts = {
 function list_commands()
 {
 	var s = "auctionuser command summary:\n";
+	s += "bid FILENAME.json\tBid on auction\n";
+	s += "bid.info AUCTION-ID\tDisplay auction bidding information\n";
+	s += "create FILENAME.json\tAuction creation, step 2\n";
 	s += "help\t\tList this command summary\n";
+	s += "info AUCTION-ID\tDisplay auction information\n";
+	s += "prepare USERID AUCTION-TYPE\tAuction creation, step 1\n";
 	console.log(s);
+}
+
+function cmd_bid(filename)
+{
+	var params = JSON.parse(fs.readFileSync(filename));
+	rpc.call('auction.bid', [ params ], rpc_opts, function(err, result) {
+		if (err)
+			console.log("Auction bid failed: " + err.message);
+		else
+			console.dir(result);
+	});
+}
+
+function cmd_bid_info(id)
+{
+	rpc.call('auction.bid.info', [{ id: id }], rpc_opts, function(err, result) {
+		if (err)
+			console.log("Auction bid.info failed: " + err.message);
+		else
+			console.dir(result);
+	});
+}
+
+function cmd_create(filename)
+{
+	var params = JSON.parse(fs.readFileSync(filename));
+	rpc.call('auction.create', [ params ], rpc_opts, function(err, result) {
+		if (err)
+			console.log("Auction create failed: " + err.message);
+		else
+			console.dir(result);
+	});
 }
 
 function cmd_info(id)
@@ -28,6 +67,25 @@ function cmd_info(id)
 	rpc.call('auction.info', [{ id: id }], rpc_opts, function(err, result) {
 		if (err)
 			console.log("Auction info failed: " + err.message);
+		else
+			console.dir(result);
+	});
+}
+
+function cmd_prepare(userid, auctionType)
+{
+	var addr = new Address(userid);
+	addr.validate();
+
+	if (auctionType == 'fpsb' || auctionType == 'FPSB')
+		auctionType = 'first-price-sealed-bid';
+	if (auctionType != 'first-price-sealed-bid')
+		throw new Error("Unknown auction type " + auctionType);
+
+	rpc.call('auction.prepare', [{ userid: userid, type: auctionType }],
+		 rpc_opts, function (err, result) {
+		if (err)
+			console.log("Auction prepare failed: " + err.message);
 		else
 			console.dir(result);
 	});
@@ -49,14 +107,38 @@ function main()
 		console.error("Unknown command", cmd);
 		// fall through
 
+	case "bid":
+		if (program.args.length != 2)
+			throw new Error("Usage: bid FILENAME.json");
+		cmd_bid(program.args[1]);
+		break;
+
+	case "bid.info":
+		if (program.args.length != 2)
+			throw new Error("Usage: bidinfo AUCTION-ID");
+		cmd_bid_info(program.args[1]);
+		break;
+
+	case "create":
+		if (program.args.length != 2)
+			throw new Error("Usage: create FILENAME.json");
+		cmd_create(program.args[1]);
+		break;
+
 	case "help":
 		list_commands();
 		return;
 	
 	case "info":
-		if (program.args.length < 2)
-			throw new Error("info: Missing required auction id");
+		if (program.args.length != 2)
+			throw new Error("Usage: info AUCTION-ID");
 		cmd_info(program.args[1]);
+		break;
+
+	case "prepare":
+		if (program.args.length != 3)
+			throw new Error("Usage: prepare USERID AUCTION-TYPE");
+		cmd_prepare(program.args[1], program.args[2]);
 		break;
 	}
 }
