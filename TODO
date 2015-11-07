@@ -3,3 +3,5 @@ at startup:
 	expire nonces, set timeouts
 	expire auctions, set timeouts
 
+Use CLTV to improve security and bidder commitments.
+

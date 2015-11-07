@@ -1,5 +1,28 @@
 
-Decentralized bitcoin auction software
+auctionpunk:  bitcoin-specific auction software.
 
 WARNING / NOTE: This is an incomplete work-in-progress.
+
+This provides a single-node auction server that serves as a semi-trusted
+auctioneer for one or more hosted auctions.  Bitcoin-specific features
+are utilized to enhance the auction.
+
+Roles:
+	- Auctioneer - Person who runs auctiond server
+	- User - Bidders in one or more auctions
+
+Details and features:
+	- First Price Sealed Bid auctions
+	- Auctioneer receives API-dictated fee for services
+	- Each auction uniquely identified by P2SH contract
+	- All bids MUST include a common TX input, provided by the
+	  auctioneer.  This guarantees that one and only one bid is ever
+	  valid.  Auctioneer cannot steal more than 1 bid per auction
+	  (versus N bids).
+	- nLockTime set to auction close.
+
+Programs:
+	- auctiond - Auction server (HTTP JSON-RPC API)
+	- auctionuser - User command line interface to auction server
+	- auctionadm - Administrator command line interface to auction server
 
